@@ -13,19 +13,23 @@ SONG_END = pygame.USEREVENT + 1
 def pauseAWhile():
     time.sleep(SLEEP_TIME)
 
-def playSpeech(dialog_box):
+def playSpeech(dialog_box,ISARDUINO,SERL):
     #start speaking
     dialog_box.play()
+    print ISARDUINO
     if ISARDUINO:
+        print "writing to serial: ",START_HAT
         SERL.write(START_HAT)
 
-def pauseSpeech():
+def pauseSpeech(ISARDUINO,SERL):
     notdone = True
     while notdone:
         for event in pygame.event.get():
             if event.type == SONG_END:
                 print("The hat has spoken!")  #TODO: add what the hat spoke
+                print ISARDUINO
                 if ISARDUINO:
+                    print "writing to serial: ",END_HAT
                     SERL.write(END_HAT)
                 notdone = False
     return None
@@ -43,7 +47,7 @@ def loadDialog(dialog_box,dialog):
     pauseAWhile()
     dialog_box.set_endevent(SONG_END)
     
-def loadAndPlayDialogs(dialog_box,dialogs):
+def loadAndPlayDialogs(dialog_box,dialogs,ISARDUINO,SERL):
     
     #stop speech
     dialog_box.stop()
@@ -51,31 +55,40 @@ def loadAndPlayDialogs(dialog_box,dialogs):
     
     n = len(dialogs)
 
-    loadDialog(dialogs[0])
-    # pygame.mixer.music.set_volume(0.5)
-    playSpeech(dialog_box)
+    # loadDialog(dialog_box,dialogs[0])
+    # playSpeech(dialog_box)
 
-    if n > 1:
-        for i in range(1,n):
-            dialog_box.queue(dialogs[i])
+    # if n > 1:
+    #     for i in range(1,n):
+    #         print "queuing: ",dialogs[i]
+    #         dialog_box.queue(dialogs[i])
 
-    #wait for speech to stop
-    pauseSpeech()
+    # #wait for speech to stop
+    # pauseSpeech()
+
+    for i in range(n):
+        print "loading: ",dialogs[i]
+        loadDialog(dialog_box,dialogs[i])
+        print "playing: ",dialogs[i]
+        playSpeech(dialog_box,ISARDUINO,SERL)
+        pygame.mixer.music.set_volume(1)
+        pauseSpeech(ISARDUINO,SERL)
     
     return None
 
-def startConv(dialog_box,recog):
+def startConv(dialog_box,recog,ISARDUINO,SERL):
 
     #load and play welcome speech
-    loadDialog(dialog_box,SP_PATHS[WELCOME2])  #TODO - add multiple random welcome speeches
+    loadDialog(dialog_box,SP_PATHS[WELCOME_HOUSE])  #TODO - add multiple random welcome speeches
     print("Loaded Welcome2")
     pauseAWhile()
-    playSpeech(dialog_box)
-    pauseSpeech()
+    playSpeech(dialog_box,ISARDUINO,SERL)
+    pauseSpeech(ISARDUINO,SERL)
 
     session = UserSession()
-    
-    while not session.decisionMade:
+    count = 3
+
+    while count != 0:
         
         #py2.7 console input
         # reply = input("Press enter to speak")
@@ -88,10 +101,18 @@ def startConv(dialog_box,recog):
             #TODO - add error handling hat reply
             continue
 
+        resp = []
         #get list of audio files to play - single file!
-        resp = analyzeSpeech(text,count)
+        if count == 3:
+            resp = [SP_PATHS[LETSFINDOUT],SP_PATHS[CHOC_FROG]]
+        elif count == 2:
+            resp = [SP_PATHS[QUIDLIBRARY]]
+        elif count == 1:
+            resp = [SP_PATHS[RIGHT_THEN],SP_PATHS[I_SORT_YOU_INTO],SP_PATHS[RAVENCLAW]]
 
-        loadAndPlayDialogs(dialog_box,resp)
+        loadAndPlayDialogs(dialog_box,resp,ISARDUINO,SERL)
+
+        count -= 1
 
 def main(argv):
 
@@ -105,6 +126,7 @@ def main(argv):
     if ISARDUINO:
         port = "/dev/ttyACM"+argv[1]
         SERL = serial.Serial(port)
+        # print ISARDUINO, SERL
 
     #init GCP recognizer
     try:
@@ -128,7 +150,7 @@ def main(argv):
             reply = raw_input("Press enter to talk to the hat!")
 
             #startconversation
-            startConv(dialog_box,recog)
+            startConv(dialog_box,recog,ISARDUINO,SERL)
 
     except KeyboardInterrupt:
         print "Closing port and exiting"
