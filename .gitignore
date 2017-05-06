@@ -1,2 +1,4 @@
+gcpkey.py
 *.pyc
-untracked
+Untracked
+audio_recognize.py

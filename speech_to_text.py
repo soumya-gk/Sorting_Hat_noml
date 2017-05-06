@@ -1,11 +1,11 @@
 import json
 import speech_recognition as sr
+from gcpkey import getkey
 
 GOOGLE_CLOUD_SPEECH_CREDENTIALS = None
 
-def initRecogs():
-    with open("untracked/hat_gcp_key.json","r") as key_file:    
-        GOOGLE_CLOUD_SPEECH_CREDENTIALS = json.load(key_file)
+def initRecogs():    
+    GOOGLE_CLOUD_SPEECH_CREDENTIALS = getkey()
 
 def getRecognizer():
     return sr.Recognizer()

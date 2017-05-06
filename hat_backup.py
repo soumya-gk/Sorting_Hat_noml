@@ -16,9 +16,7 @@ def pauseAWhile():
 def playSpeech(dialog_box,ISARDUINO,SERL):
     #start speaking
     dialog_box.play()
-    print ISARDUINO
     if ISARDUINO:
-        print "writing to serial: ",START_HAT
         SERL.write(START_HAT)
 
 def pauseSpeech(ISARDUINO,SERL):
@@ -27,7 +25,6 @@ def pauseSpeech(ISARDUINO,SERL):
         for event in pygame.event.get():
             if event.type == SONG_END:
                 print("The hat has spoken!")  #TODO: add what the hat spoke
-                print ISARDUINO
                 if ISARDUINO:
                     print "writing to serial: ",END_HAT
                     SERL.write(END_HAT)
@@ -57,14 +54,6 @@ def loadAndPlayDialogs(dialog_box,dialogs,ISARDUINO,SERL):
 
     # loadDialog(dialog_box,dialogs[0])
     # playSpeech(dialog_box)
-
-    # if n > 1:
-    #     for i in range(1,n):
-    #         print "queuing: ",dialogs[i]
-    #         dialog_box.queue(dialogs[i])
-
-    # #wait for speech to stop
-    # pauseSpeech()
 
     for i in range(n):
         print "loading: ",dialogs[i]
