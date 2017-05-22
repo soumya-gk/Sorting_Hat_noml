@@ -49,20 +49,8 @@ def loadAndPlayDialogs(dialog_box,dialogs,ISARDUINO,SERL):
     
     #stop speech
     dialog_box.stop()
-    # print "stopped hat speech"
     
     n = len(dialogs)
-
-    # loadDialog(dialog_box,dialogs[0])
-    # playSpeech(dialog_box)
-
-    # if n > 1:
-    #     for i in range(1,n):
-    #         print "queuing: ",dialogs[i]
-    #         dialog_box.queue(dialogs[i])
-
-    # #wait for speech to stop
-    # pauseSpeech()
 
     for i in range(n):
         print "loading: ",dialogs[i]

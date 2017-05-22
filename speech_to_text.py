@@ -2,10 +2,12 @@ import json
 import speech_recognition as sr
 from gcpkey import getkey
 
-GOOGLE_CLOUD_SPEECH_CREDENTIALS = None
-
-def initRecogs():    
-    GOOGLE_CLOUD_SPEECH_CREDENTIALS = getkey()
+# Note that GOOGLE_CLOUD_SPEECH_CREDENTIALS key 
+# is not provided in this github repo.
+# This key can be obtained on signing up on Google Cloud Platform
+# and using their Speech-to-Text API
+GOOGLE_CLOUD_SPEECH_CREDENTIALS = getkey()
+INDEX = 5
 
 def getRecognizer():
     return sr.Recognizer()
@@ -14,15 +16,17 @@ def getSpeech2Text(recog):
     # obtain audio from the microphone
     text = None
 
-    with sr.Microphone() as source:
+    with sr.Microphone(device_index=INDEX) as source:
         print("Recording...")
         recog.adjust_for_ambient_noise(source)
         audio = recog.listen(source)
 
-    # text = sphinxRec(recog,audio)
+    # get text from speech 
     if GOOGLE_CLOUD_SPEECH_CREDENTIALS:
         text = gcpRec(recog,audio)
+        print "gcp selected"
     else:
+        print "google_service selected"
         text = googleRec(recog,audio)
 
     return text
@@ -64,3 +68,5 @@ def gcpRec(recog,audio):
         print("Google Cloud Speech could not understand audio")
     except sr.RequestError as e:
         print("Could not request results from Google Cloud Speech service; {0}".format(e))
+
+    return text

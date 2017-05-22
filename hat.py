@@ -4,10 +4,11 @@ import serial
 import sys
 import time
 import traceback
+import speech_recognition as sr
 
 from constants import *
-from engine_hat import analyzeSpeech, UserSession
-from speech_to_text import initRecogs, getSpeech2Text, getRecognizer
+from engine_hat import analyzeSpeech, analyzeSpeechShort, getRandomElem, UserSession
+from speech_to_text import getSpeech2Text, getRecognizer
 
 SONG_END = pygame.USEREVENT + 1
 
@@ -20,7 +21,17 @@ def playSpeech(dialog_box,ISARDUINO,SERL):
     if ISARDUINO:
         SERL.write(START_HAT)
 
-def pauseSpeech(ISARDUINO,SERL):
+def raiseHat(ISARDUINO,SERL):
+    if ISARDUINO:
+        print "waking up!"
+        SERL.write(RAISE_HAT)
+
+def lowerHat(ISARDUINO,SERL):
+    if ISARDUINO:
+        print "Sleeping!"
+        SERL.write(LOWER_HAT)
+
+def stopSpeech(ISARDUINO,SERL):
     notdone = True
     while notdone:
         for event in pygame.event.get():
@@ -52,43 +63,49 @@ def loadAndPlayDialogs(dialog_box,dialogs,ISARDUINO,SERL):
     
     n = len(dialogs)
 
+    raiseHat(ISARDUINO,SERL)
     for i in range(n):
-        print "loading: ",dialogs[i]
+        # print "loading: ",dialogs[i]
         loadDialog(dialog_box,dialogs[i])
         print "playing: ",dialogs[i]
         playSpeech(dialog_box,ISARDUINO,SERL)
         pygame.mixer.music.set_volume(1)
-        pauseSpeech(ISARDUINO,SERL)
+        stopSpeech(ISARDUINO,SERL)
+    lowerHat(ISARDUINO,SERL)
     
     return None
 
-def startConv(dialog_box,recog):
+def startConv(dialog_box,recog,ISARDUINO,SERL):
 
     #load and play welcome speech
-    rand_welcome = ran.randint(0,len(STATES[ST_WELCOME])-1)  #TODO: randomize
-    rand_pref = ran.randint(0,len(STATES[ST_HP_KNOWLEDGE])-1)
-    loadAndPlayDialogs(dialog_box,[SP_PATHS[rand_welcome],SP_PATHS[rand_pref]])
+    rand_welcome = getRandomElem(STATES[ST_WELCOME])
+    rand_pref = getRandomElem(STATES[ST_HP_KNOWLEDGE])
+
+    loadAndPlayDialogs(dialog_box,[SP_PATHS[rand_welcome],SP_PATHS[rand_pref]],ISARDUINO,SERL)
     print("Welcoming new student!")
 
     session = UserSession()
+    count = 3
     
     while not session.decisionMade:
         
-        #py2.7 console input
-        # reply = input("Press enter to speak")
-
         #get speech from user and convert to text
-        print "What do you say?..."
-        text = getSpeech2Text(recog)
+        try:
+            text = getSpeech2Text(recog)
+        except sr.WaitTimeoutError:
+        #py2.7 console input
+        # text = raw_input("What did you say?...")
 
         if not text:
-            #TODO - add error handling hat reply
-            continue
+            print "text empty"
+            text = raw_input("What did you say?...")
 
         #get list of audio files to play - single file!
-        resp = analyzeSpeech(text,session)
+        # resp = analyzeSpeech(text,session)
+        resp = analyzeSpeechShort(text,session,count)
+        count -= 1
 
-        loadAndPlayDialogs(dialog_box,resp)
+        loadAndPlayDialogs(dialog_box,resp,ISARDUINO,SERL)
 
 def main(argv):
 
@@ -99,16 +116,17 @@ def main(argv):
 
     #set arduino port number and and initialize serial
     ISARDUINO = (argv[0] == "True")
+    SERL = None
     if ISARDUINO:
         port = "/dev/ttyACM"+argv[1]
         SERL = serial.Serial(port)
 
     #init GCP recognizer
-    try:
-        initRecogs()
-    except Exception:
-        print "Error reading GCP file containing credentials"
-        traceback.print_exc()
+    # try:
+    #     initRecogs()
+    # except Exception:
+    #     print "Error reading GCP file containing credentials"
+    #     traceback.print_exc()
 
     #initialize pygame for playing speech
     pygame.init()
@@ -122,7 +140,7 @@ def main(argv):
     
     try:
         while True:
-            reply = raw_input("Press enter to talk to the hat!")
+            reply = raw_input("Press enter to wake up the hat!")
 
             #startconversation
             startConv(dialog_box,recog,ISARDUINO,SERL)
