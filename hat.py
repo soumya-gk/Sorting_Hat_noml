@@ -1,13 +1,11 @@
-import pygame
-import random as ran
-import serial
-import sys
+import pygame           #to play sound files
+import serial           #to connect to arduino through USB
+import sys 
 import time
-import traceback
-import speech_recognition as sr
 
+import constants
 from constants import *
-from engine_hat import analyzeSpeech, analyzeSpeechShort, getRandomElem, UserSession
+from engine_hat import analyzeSpeech, analyzeSpeechShort, getRandomElem, UserSession, getWelcomeSpeech
 from speech_to_text import getSpeech2Text, getRecognizer
 
 SONG_END = pygame.USEREVENT + 1
@@ -15,32 +13,28 @@ SONG_END = pygame.USEREVENT + 1
 def pauseAWhile():
     time.sleep(SLEEP_TIME)
 
-def playSpeech(dialog_box,ISARDUINO,SERL):
+def playSpeech(dialog_box,SERL):
     #start speaking
     dialog_box.play()
-    if ISARDUINO:
+    if SERL:
         SERL.write(START_HAT)
 
-def raiseHat(ISARDUINO,SERL):
-    if ISARDUINO:
-        print "waking up!"
+def raiseHat(SERL):
+    if SERL:
         SERL.write(RAISE_HAT)
 
-def lowerHat(ISARDUINO,SERL):
-    if ISARDUINO:
-        print "Sleeping!"
+def lowerHat(SERL):
+    if SERL:
         SERL.write(LOWER_HAT)
 
-def stopSpeech(ISARDUINO,SERL):
+def stopSpeech(SERL):
     notdone = True
     while notdone:
         for event in pygame.event.get():
             if event.type == SONG_END:
-                print("The hat has spoken!")  #TODO: add what the hat spoke
-                if ISARDUINO:
+                if SERL:
                     SERL.write(END_HAT)
                 notdone = False
-    return None
 
 def readSerial():
     # if SERL.inWaiting()>0:
@@ -50,107 +44,144 @@ def readSerial():
     return None
 
 def loadDialog(dialog_box,dialog):
-    #load first dialog
-    dialog_box.load(dialog)
+    #load dialog from 
+    print "Hat says: {}".format(dialog[TEXT])
+    dialog_box.load(dialog[PATH])
     pauseAWhile()
     dialog_box.set_endevent(SONG_END)
     
-def loadAndPlayDialogs(dialog_box,dialogs,ISARDUINO,SERL):
+def loadAndPlayDialogs(dialog_box,dialogs,SERL):
     
     #stop speech
     dialog_box.stop()
-    # print "stopped hat speech"
     
     n = len(dialogs)
 
-    raiseHat(ISARDUINO,SERL)
+    raiseHat(SERL)
     for i in range(n):
-        # print "loading: ",dialogs[i]
         loadDialog(dialog_box,dialogs[i])
-        print "playing: ",dialogs[i]
-        playSpeech(dialog_box,ISARDUINO,SERL)
+        if constants.DEBUG:
+            print "playing: ",dialogs[i][PATH]
+        playSpeech(dialog_box,SERL)
         pygame.mixer.music.set_volume(1)
-        stopSpeech(ISARDUINO,SERL)
-    lowerHat(ISARDUINO,SERL)
+        stopSpeech(SERL)
+    lowerHat(SERL)
+
+def startConv(dialog_box,recog,SERL=None,MIC_INDEX=None):
+
+    isShort = False # change to True if you want a shorter conversation
+
+    session = UserSession(isShort)
     
-    return None
-
-def startConv(dialog_box,recog,ISARDUINO,SERL):
-
     #load and play welcome speech
-    rand_welcome = getRandomElem(STATES[ST_WELCOME])
-    rand_pref = getRandomElem(STATES[ST_HP_KNOWLEDGE])
+    welcome_speech = getWelcomeSpeech(session)
 
-    loadAndPlayDialogs(dialog_box,[SP_PATHS[rand_welcome],SP_PATHS[rand_pref]],ISARDUINO,SERL)
-    print("Welcoming new student!")
+    if constants.DEBUG:
+        print("Welcoming new student...")
+    loadAndPlayDialogs(dialog_box,welcome_speech,SERL)
 
-    session = UserSession()
-    count = 3
-    
     while not session.decisionMade:
         
         #get speech from user and convert to text
-        try:
-            text = getSpeech2Text(recog)
-        except sr.WaitTimeoutError:
-        #py2.7 console input
-        # text = raw_input("What did you say?...")
+        text = None
+        # text = getSpeech2Text(recog,MIC_INDEX)
 
         if not text:
-            print "text empty"
+            # print "Provide text input"
             text = raw_input("What did you say?...")
 
-        #get list of audio files to play - single file!
-        # resp = analyzeSpeech(text,session)
-        resp = analyzeSpeechShort(text,session,count)
-        count -= 1
+        #get list of audio files to play as response
+        resp = analyzeSpeech(text,session)
 
-        loadAndPlayDialogs(dialog_box,resp,ISARDUINO,SERL)
+        loadAndPlayDialogs(dialog_box,resp,SERL)
+
+def getPort(argv):
+    i = 0
+    last_index = len(argv)-1
+    while(argv[i] != "-p") and i < last_index:
+        i += 1
+    if i < last_index:
+        return argv[i+1]
+
+    return None
+
+def getMic(argv):
+    i = 0
+    last_index = len(argv)-1
+    while(argv[i] != "-m") and i < last_index:
+        i += 1
+    if i < last_index:
+        return argv[i+1]
+
+    return None
+
+def getDebug(argv):
+    i = 0
+    last_index = len(argv)-1
+    while(argv[i] != "-d") and i < last_index:
+        i += 1
+    if i < last_index:
+        if argv[i+1].lower() == "true":
+            return True
+
+    return False
 
 def main(argv):
+    '''
+    Talk to the Sorting Hat, answer his questions and get sorted into 
+    one of four Hogwarts houses - Gryffindor, Hufflepuff, Ravenclaw & Slytherin.
+    To run this program enter command (arguments are optional):
+        python hat.py -p <arduino_port_num> -m <mic_index_num>
 
+    arduino_port_num - this is the port number to which arduino 
+    controlling the hat movements is connected. (in Linux environment only)
+    Not providing it runs only the conversational agent 
+
+    mic_index_num - this argument is the index of the preferred microphone(mic)
+    If not provided, program selects the default system mic.
+
+    Run "mics.py" to get a list of available microphones and their indices.
+    '''
     #check for arduino port number argument else exit
-    if len(argv) < 1:
-        print "Provide 2 arguments: True if arduino is connected (else False) and its corresponding port number!"
-        exit()
-
-    #set arduino port number and and initialize serial
-    ISARDUINO = (argv[0] == "True")
     SERL = None
-    if ISARDUINO:
-        port = "/dev/ttyACM"+argv[1]
-        SERL = serial.Serial(port)
+    MIC_INDEX = None
+    if len(argv) > 0:
+        #set arduino port number and and initialize serial
+        port = getPort(argv)
+        if port:
+            port = "/dev/ttyACM"+port
+            SERL = serial.Serial(port)
+        MIC_INDEX = getMic(argv)
+        constants.DEBUG = getDebug(argv)
 
-    #init GCP recognizer
-    # try:
-    #     initRecogs()
-    # except Exception:
-    #     print "Error reading GCP file containing credentials"
-    #     traceback.print_exc()
+    if constants.DEBUG:
+        print("Set command line parameters")
 
-    #initialize pygame for playing speech
+    #initialize pygame for speech response playback
     pygame.init()
     pauseAWhile()
-    print("Initialized pygame")
+    if constants.DEBUG:
+        print("Initialized pygame")
     dialog_box = pygame.mixer.music
 
     #initialize recognizer
     recog = getRecognizer()
-    print("Got recognizer")
+    if constants.DEBUG:
+        print("Initialized recognizer")
     
     try:
         while True:
             reply = raw_input("Press enter to wake up the hat!")
 
             #startconversation
-            startConv(dialog_box,recog,ISARDUINO,SERL)
+            startConv(dialog_box,recog,SERL,MIC_INDEX)
 
     except KeyboardInterrupt:
-        print "Closing port and exiting"
-        if ISARDUINO:
+        print "\nHat says: Farewell student!"
+        if SERL:
             SERL.close()
         dialog_box.stop()
         exit()
 
 if __name__ == "__main__":
-   main(sys.argv[1:])
+    main(sys.argv[1:])
